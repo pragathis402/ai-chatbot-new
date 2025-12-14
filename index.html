@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI CHATBOT</title>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.5.141/pdf.min.js"></script>
+
+    <style>
+        /* --- GLOBAL & THEME VARIABLES --- */
+        :root {
+            --bg-color: #343541;
+            --sidebar-bg: #202123;
+            --chat-item-bg: #444654;
+            --text-color: #ececf1;
+            --input-bg: #40414f;
+            --border-color: #565869;
+            --accent-color: #10a37f;
+            --accent-hover: #1a7f64;
+            --user-color: #5c5c99;
+            --ai-color: #10a37f;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        body.light-mode {
+            --bg-color: #ffffff;
+            --sidebar-bg: #f7f7f8;
+            --chat-item-bg: #f0f0f0;
+            --text-color: #333333;
+            --input-bg: #ffffff;
+            --border-color: #d9d9e3;
+            --accent-color: #8e44ad;
+            --accent-hover: #732d91;
+            --user-color: #6366f1;
+            --ai-color: #8e44ad;
+            --danger-color: #dc2626;
+            --warning-color: #d97706;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            height: 100vh; 
+            overflow: hidden; 
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* --- THREE.JS BACKGROUND --- */
+        #container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- LAYOUT GRID --- */
+        #root {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            transition: transform 0.3s ease, width 0.25s ease, padding 0.25s ease;
+            z-index: 100;
+            border-right: 1px solid var(--border-color);
+            min-height: 100vh;
+            /* Added for mobile overlay */
+            position: fixed; 
+            height: 100%;
+        }
+
+        /* Collapsed (icon rail) - 60px width */
+        .sidebar.collapsed {
+            width: 60px;
+            padding-left: 6px;
+            padding-right: 6px;
+        }
+
+        .sidebar .sidebar-content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* New chat button: icon + optional text */
+        .new-chat-btn {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            color: var(--text-color);
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            transition: background 0.2s, padding 0.2s;
+            width: 100%;
+        }
+
+        /* Center icon only in collapsed */
+        .sidebar.collapsed .new-chat-btn {
+            justify-content: center;
+            padding: 8px;
+        }
+
+        .new-chat-btn .btn-label { display: inline-block; }
+        .sidebar.collapsed .new-chat-btn .btn-label { display: none; }
+
+        .minimize-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .minimize-btn:hover { background: rgba(255,255,255,0.03); }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 6px;
+        }
+
+        .history-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-color);
+            opacity: 0.9;
+            font-size: 0.95rem;
+            position: relative;
+            transition: background 0.15s, padding 0.15s, justify-content 0.15s;
+        }
+
+        .history-item:hover { background-color: rgba(255,255,255,0.04); opacity: 1; }
+        .history-item.active { 
+            background-color: rgba(255,255,255,0.05); 
+            font-weight: 600; 
+            border: 1px solid var(--border-color); 
+        }
+        body.light-mode .history-item.active {
+            background-color: rgba(0,0,0,0.05); 
+        }
+
+
+        .history-item-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .history-item-content i { min-width: 24px; text-align: center; }
+
+        .history-item .item-title { display: inline-block; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Collapsed: show icon only, center it vertically */
+        .sidebar.collapsed .history-item {
+            justify-content: center;
+            padding: 8px;
+            margin-bottom: 6px;
+        }
+        .sidebar.collapsed .history-item .history-item-content { justify-content: center; }
+        .sidebar.collapsed .history-item .item-title { display: none; }
+
+        .history-item-actions {
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .history-item:hover .history-item-actions {
+            opacity: 1;
+        }
+
+        .history-item-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.7;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .history-item-btn:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.06);
+        }
+
+        /* --- MAIN CHAT AREA --- */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 0;
+        }
+
+        /* Header */
+        .header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 0;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* Chat Messages Container */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 0 20px 0;
+            display: flex;
+            flex-direction: column;
+            scroll-behavior: smooth;
+            min-width: 0;
+        }
+
+        /* Suggestion Chips */
+        .suggestion-chip {
+            background: rgba(255,255,255,0.08);
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            border: 1px solid transparent;
+        }
+        
+        .suggestion-chip:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: var(--border-color);
+        }
+        
+        .suggestion-chip:active {
+            transform: scale(0.98);
+        }
+        body.light-mode .suggestion-chip {
+            background: rgba(0,0,0,0.05);
+        }
+        body.light-mode .suggestion-chip:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+
+        .message {
+            display: flex;
+            gap: 15px;
+            padding: 24px;
+            line-height: 1.6;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            min-width: 0;
+        }
+
+        .message.user { background-color: transparent; }
+        .message.ai { background-color: var(--chat-item-bg); }
+
+        /* Message Formatting Styles */
+        .message-content {
+            flex: 1;
+            max-width: 800px;
+            min-width: 0;
+        }
+
+        .message-content h1, .message-content h2, .message-content h3 {
+            margin: 1em 0 0.5em 0;
+            color: var(--accent-color);
+        }
+
+        .message-content p {
+            margin: 0.5em 0;
+        }
+
+        .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .user .avatar { background: var(--user-color); color: white; }
+        .ai .avatar { background: var(--ai-color); color: white; }
+
+        .msg-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.6;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .action-btn:hover { 
+            opacity: 1; 
+            background: rgba(255,255,255,0.06);
+        }
+        body.light-mode .action-btn:hover {
+            background: rgba(0,0,0,0.06);
+        }
+
+
+        .action-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px;
+            background-image: linear-gradient(180deg, rgba(53,53,65,0), var(--bg-color) 40%);
+            display: flex;
+            justify-content: center;
+        }
+
+        .input-wrapper {
+            width: 100%;
+            max-width: 768px;
+            position: relative;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            /* Increased padding for taller input box */
+            padding: 18px 18px; /* Increased vertical padding */
+            display: flex;
+            align-items: center;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            min-width: 0;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            resize: none;
+            /* Increased default height */
+            height: 20px; /* Base height for single line */
+            max-height: 200px;
+            outline: none;
+            padding: 0;
+            font-size: 16px;
+            line-height: 20px; 
+            min-width: 0;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 10px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover { background-color: rgba(128,128,128,0.12); }
+        .send-btn { color: var(--accent-color); }
+        .stop-btn { color: var(--danger-color); }
+        .recording { color: #ff4444 !important; animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 90%;
+            text-align: center;
+        }
+        .toast.show { opacity: 1; }
+
+        .toast.success { background-color: var(--accent-color); }
+        .toast.error { background-color: var(--danger-color); }
+        .toast.warning { background-color: var(--warning-color); }
+
+        /* Settings Modal */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .settings-modal.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .settings-content {
+            background: var(--bg-color);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            border: 1px solid var(--border-color);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-group {
+            margin-bottom: 25px;
+        }
+
+        .settings-group h3 {
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .settings-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        select, input[type="range"] {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .range-value {
+            min-width: 30px;
+            text-align: right;
+        }
+
+        .sidebar-footer {
+            padding-top: 15px;
+            margin-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .sidebar-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .sidebar-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            opacity: 0.9;
+            transition: all 0.15s;
+            width: 100%;
+        }
+
+        /* Collapsed: center icon-only buttons */
+        .sidebar.collapsed .sidebar-btn {
+            justify-content: center;
+            padding: 8px;
+        }
+        .sidebar-btn .btn-label { display: inline-block; }
+        .sidebar.collapsed .sidebar-btn .btn-label { display: none; }
+
+        .sidebar-btn:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .sidebar-btn.danger {
+            color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+
+        .dev-button {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            padding: 12px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 6px;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .dev-button .dev-label { display:inline-block; }
+        .sidebar.collapsed .dev-button .dev-label { display: none; }
+        .sidebar.collapsed .dev-button { justify-content:center; padding:8px; }
+
+        .dev-button:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.04);
+            border-color: var(--accent-color);
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            padding: 10px 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Mobile Responsiveness Fixes (max-width: 768px) */
+        @media (max-width: 768px) {
+            /* Sidebar becomes overlay (full) on mobile, hidden by default */
+            .sidebar {
+                transform: translateX(-100%);
+                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+                width: 260px; 
+            }
+
+            /* FIX: When open, show it */
+            .sidebar.open { 
+                transform: translateX(0); 
+            }
+
+            /* FIX: When collapsed on mobile, still hide it unless explicitly open. 
+               Only apply the 60px width when it is both collapsed AND open (user chose to open it small). */
+            .sidebar.collapsed:not(.open) {
+                transform: translateX(-100%); 
+            }
+
+            .sidebar.open.collapsed {
+                width: 60px;
+                transform: translateX(0);
+            }
+
+            .mobile-menu-btn { display: block; }
+            
+            /* Reduced padding for better mobile view */
+            .message { padding: 15px; }
+            .input-area { padding: 15px; }
+            .header { padding: 10px 15px; }
+        }
+
+        /* Desktop specific styles for sidebar-in-line layout */
+        @media (min-width: 769px) {
+            .sidebar {
+                position: relative; /* Not fixed/overlay on desktop */
+                transform: translateX(0) !important; /* Always visible on desktop */
+            }
+        }
+
+        /* Ensure clickable area and scrollbars look good */
+        .history-list::-webkit-scrollbar { width: 8px; }
+        .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
+        body.light-mode .history-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.06); }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="root"></div>
+    <div class="toast" id="toast"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // Helper function for global toast notification
+        function showToast(msg, error = false, type = 'info') {
+            const toast = document.getElementById("toast");
+            toast.textContent = msg;
+            toast.className = `toast ${type}`;
+            
+            // Simplified color logic based on type
+            if (type === 'error' || error) {
+                toast.style.background = "var(--danger-color)";
+            } else if (type === 'warning') {
+                toast.style.background = "var(--warning-color)";
+            } else {
+                toast.style.background = "var(--accent-color)";
+            }
+            
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 3000);
+        }
+
+        // --- 1. Settings Modal Component ---
+        const SettingsModal = ({ isOpen, onClose, settings, onSettingsChange }) => {
+            if (!isOpen) return null;
+
+            const handleChange = useCallback((key, value) => {
+                onSettingsChange(prev => ({ ...prev, [key]: value }));
+                showToast('Settings saved');
+            }, [onSettingsChange]);
+
+            return (
+                <div className={`settings-modal ${isOpen ? 'show' : ''}`} onClick={onClose}>
+                    <div className="settings-content" onClick={e => e.stopPropagation()}>
+                        <div className="settings-header">
+                            <h2>Settings</h2>
+                            <button className="icon-btn" onClick={onClose} title="Close">
+                                <i className="ph ph-x"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="settings-group">
+                            <h3>Appearance</h3>
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-palette"></i>
+                                    <span>Theme</span>
+                                </div>
+                                <select 
+                                    value={settings.theme} 
+                                    onChange={(e) => handleChange('theme', e.target.value)}
+                                >
+                                    <option value="dark">Dark Mode</option>
+                                    <option value="light">Light Mode</option>
+                                    <option value="auto">System</option>
+                                </select>
+                            </div>
+                            
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-font-family"></i>
+                                    <span>Font Size</span>
+                                </div>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                    <input 
+                                        type="range" 
+                                        min="12" 
+                                        max="18" 
+                                        value={settings.fontSize} 
+                                        onChange={(e) => handleChange('fontSize', parseInt(e.target.value))}
+                                    />
+                                    <span className="range-value">{settings.fontSize}px</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="settings-group">
+                            <h3>Behavior</h3>
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-speaker-high"></i>
+                                    <span>Auto-Read Responses</span>
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={settings.autoRead} 
+                                    onChange={(e) => handleChange('autoRead', e.target.checked)}
+                                />
+                            </div>
+                            
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-copy"></i>
+                                    <span>Auto-Copy Responses</span>
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={settings.autoCopy} 
+                                    onChange={(e) => handleChange('autoCopy', e.target.checked)}
+                                />
+                            </div>
+                            
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-clock"></i>
+                                    <span>Response Speed</span>
+                                </div>
+                                <select 
+                                    value={settings.responseSpeed} 
+                                    onChange={(e) => handleChange('responseSpeed', e.target.value)}
+                                >
+                                    <option value="fast">Fast</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="slow">Slow (Simulated)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div className="settings-group">
+                            <h3>AI Settings</h3>
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-brain"></i>
+                                    <span>AI Model</span>
+                                </div>
+                                <select 
+                                    value={settings.aiModel} 
+                                    onChange={(e) => handleChange('aiModel', e.target.value)}
+                                >
+                                    <option value="gemini">Gemini Pro</option>
+                                    <option value="gpt">GPT-3.5</option>
+                                    <option value="claude">Claude</option>
+                                </select>
+                            </div>
+                            
+                            <div className="settings-row">
+                                <div className="settings-label">
+                                    <i className="ph ph-thermometer"></i>
+                                    <span>Creativity (Temperature)</span>
+                                </div>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                    <input 
+                                        type="range" 
+                                        min="0" 
+                                        max="1" 
+                                        step="0.1"
+                                        value={settings.creativity} 
+                                        onChange={(e) => handleChange('creativity', parseFloat(e.target.value))}
+                                    />
+                                    <span className="range-value">{settings.creativity.toFixed(1)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 2. Sidebar Component ---
+        const Sidebar = ({ 
+            history, 
+            activeChatId, 
+            onSelectChat, 
+            onNewChat, 
+            onDeleteChat, 
+            onClearAllChats,
+            onRenameChat,
+            isOpen, 
+            toggleSidebar,
+            onShareChats,
+            onImportChats,
+            isCollapsed,
+            setCollapsed
+        }) => {
+            const [renamingChatId, setRenamingChatId] = useState(null);
+            const [renameValue, setRenameValue] = useState('');
+
+            const handleRename = (chat) => {
+                if (renameValue.trim()) {
+                    onRenameChat(chat.id, renameValue.trim());
+                }
+                setRenamingChatId(null);
+                setRenameValue('');
+            };
+
+            // Use useCallback for stable functions passed to the sidebar
+            const handleShare = useCallback(() => {
+                onShareChats();
+                if(window.innerWidth < 768) toggleSidebar();
+            }, [onShareChats, toggleSidebar]);
+
+            const handleImport = useCallback(() => {
+                onImportChats();
+                if(window.innerWidth < 768) toggleSidebar();
+            }, [onImportChats, toggleSidebar]);
+            
+            const handleSelect = useCallback((id) => {
+                onSelectChat(id); 
+                if(window.innerWidth < 768) toggleSidebar();
+            }, [onSelectChat, toggleSidebar]);
+
+            const handleNewChat = useCallback(() => {
+                onNewChat(); 
+                if(window.innerWidth < 768) toggleSidebar();
+            }, [onNewChat, toggleSidebar]);
+
+
+            return (
+                <div className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
+                    <div className="sidebar-content">
+                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                            <button className="new-chat-btn" onClick={handleNewChat}>
+                                <i className="ph ph-plus" style={{fontSize: '18px'}}></i>
+                                <span className="btn-label">New Chat</span>
+                            </button>
+                            <button className="minimize-btn" title={isCollapsed ? "Expand sidebar" : "Minimize sidebar"} onClick={() => setCollapsed(!isCollapsed)}>
+                                {isCollapsed ? <i className="ph ph-arrow-right"></i> : <i className="ph ph-arrow-left"></i>}
+                            </button>
+                        </div>
+                        
+                        <div className="history-list">
+                            <div style={{fontSize:'0.75em', color:'gray', padding:'0 10px 10px', textTransform:'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                <span>Recent</span>
+                                {history.length > 0 && (
+                                    <span style={{fontSize: '0.7em', opacity: 0.7}}>
+                                        {history.length} chat{history.length !== 1 ? 's' : ''}
+                                    </span>
+                                )}
+                            </div>
+                            {history.length === 0 && (
+                                <div style={{padding:'0 10px', fontSize:'0.9em', opacity:0.5, textAlign: 'center', marginTop: '20px'}}>
+                                    No history yet. Start a new chat!
+                                </div>
+                            )}
+                            {history.map(chat => (
+                                <div 
+                                    key={chat.id} 
+                                    className={`history-item ${activeChatId === chat.id ? 'active' : ''}`}
+                                >
+                                    <div 
+                                        className="history-item-content"
+                                        onClick={() => handleSelect(chat.id)}
+                                        style={{width: '100%'}}
+                                    >
+                                        <i className="ph ph-chat-circle" aria-hidden="true" style={{fontSize: '18px'}}></i>
+                                        {renamingChatId === chat.id ? (
+                                            <input
+                                                type="text"
+                                                value={renameValue}
+                                                onChange={(e) => setRenameValue(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleRename(chat)}
+                                                onBlur={() => handleRename(chat)}
+                                                autoFocus
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'var(--text-color)',
+                                                    outline: 'none',
+                                                    width: '100%'
+                                                }}
+                                            />
+                                        ) : (
+                                            <span className="item-title" title={chat.title}>{chat.title}</span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="history-item-actions">
+                                        {renamingChatId !== chat.id && (
+                                            <>
+                                                <button 
+                                                    className="history-item-btn" 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setRenamingChatId(chat.id);
+                                                        setRenameValue(chat.title);
+                                                    }}
+                                                    title="Rename chat"
+                                                >
+                                                    <i className="ph ph-pencil-simple"></i>
+                                                </button>
+                                                <button 
+                                                    className="history-item-btn" 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Delete this chat?')) {
+                                                            onDeleteChat(chat.id);
+                                                        }
+                                                    }}
+                                                    title="Delete chat"
+                                                >
+                                                    <i className="ph ph-trash"></i>
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="sidebar-footer">
+                            <div className="sidebar-actions">
+                                <button className="sidebar-btn" onClick={handleShare}>
+                                    <i className="ph ph-share-network"></i> <span className="btn-label">Share Chat</span>
+                                </button>
+                                <button className="sidebar-btn" onClick={handleImport}>
+                                    <i className="ph ph-folder-open"></i> <span className="btn-label">Import Chats / Files</span>
+                                </button>
+                                {history.length > 0 && (
+                                    <button 
+                                        className="sidebar-btn danger" 
+                                        onClick={() => {
+                                            if (confirm('Clear all chat history?')) {
+                                                onClearAllChats();
+                                            }
+                                        }}
+                                    >
+                                        <i className="ph ph-trash"></i> <span className="btn-label">Clear All Chats</span>
+                                    </button>
+                                )}
+                            </div>
+                            
+                            <a href="profile.html" className="dev-button" style={{marginTop:'auto'}}>
+                                <i className="ph ph-user-circle"></i> <span className="dev-label">About Developer</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 3. Chat Message Component ---
+        const ChatMessage = ({ msg, onRegenerate, onEdit, settings }) => {
+            const [isSpeaking, setIsSpeaking] = useState(false);
+            const contentRef = useRef(null);
+
+            // Format text with markdown support
+            const formatText = (text) => {
+                if (!text) return "";
+                
+                try {
+                    // Configure marked options
+                    marked.setOptions({
+                        breaks: true,
+                        gfm: true
+                    });
+
+                    // Convert markdown to HTML
+                    const html = marked.parse(text);
+                    return html;
+                } catch (err) {
+                    console.error('Markdown parsing error:', err);
+                    return text.replace(/\n/g, '<br>');
+                }
+            };
+
+            // Speak text
+            const speak = useCallback((text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // FIX: Stop any current speech
+                    
+                    const cleanText = text.replace(/[#*`]/g, '').trim();
+                    if (!cleanText) return;
+                    
+                    const utterance = new SpeechSynthesisUtterance(cleanText);
+                    
+                    // Get available voices
+                    const voices = window.speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        const preferredVoice = voices.find(v => v.lang.includes('en') && v.name.includes('Natural')) ||
+                                               voices.find(v => v.lang.includes('en'));
+                        if (preferredVoice) {
+                            utterance.voice = preferredVoice;
+                        }
+                    }
+                    
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+                    
+                    utterance.onstart = () => setIsSpeaking(true);
+                    utterance.onend = () => setIsSpeaking(false);
+                    utterance.onerror = () => setIsSpeaking(false);
+                    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    showToast("Text-to-speech not supported in your browser", true, 'error');
+                }
+            }, []);
+
+            const stopSpeaking = useCallback(() => {
+                window.speechSynthesis.cancel(); // FIX: Stop any current speech
+                setIsSpeaking(false);
+            }, []);
+
+            const copyToClipboard = async (text) => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showToast('Copied to clipboard!');
+                } catch (err) {
+                    showToast('Failed to copy', true, 'error');
+                }
+            };
+
+            const handleRegenerate = useCallback(() => {
+                if (onRegenerate) {
+                    onRegenerate(msg.content);
+                }
+            }, [onRegenerate, msg.content]);
+
+            const handleEdit = useCallback(() => {
+                if (onEdit) {
+                    onEdit(msg.content);
+                }
+            }, [onEdit, msg.content]);
+
+            useEffect(() => {
+                // Highlight code after rendering
+                if (contentRef.current) {
+                    const codeBlocks = contentRef.current.querySelectorAll('pre code');
+                    codeBlocks.forEach(block => {
+                        Prism.highlightElement(block);
+                    });
+                }
+            }, [msg.content]);
+
+            useEffect(() => {
+                // Auto-read logic
+                if (msg.role === 'ai' && msg.content !== 'Thinking...' && settings.autoRead) {
+                    speak(msg.content);
+                }
+                // Cleanup on component unmount or message change
+                return () => {
+                    if (window.speechSynthesis) {
+                         window.speechSynthesis.cancel();
+                    }
+                };
+            }, [msg.content, settings.autoRead, speak]);
+
+            return (
+                <div className={`message ${msg.role}`}>
+                    <div className="avatar">
+                        {msg.role === 'user' ? (
+                            <i className="ph ph-user"></i>
+                        ) : (
+                            <i className="ph ph-lightning"></i>
+                        )}
+                    </div>
+                    <div className="content-wrapper" style={{width: '100%', maxWidth: '800px', margin: '0 auto'}}>
+                        <div 
+                            ref={contentRef}
+                            className="message-content" 
+                            dangerouslySetInnerHTML={{ __html: formatText(msg.content) }}
+                            style={{ fontSize: `${settings.fontSize}px` }}
+                        />
+                        
+                        {msg.role === 'ai' && msg.content === 'Thinking...' ? (
+                            <div className="typing-indicator">
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                            </div>
+                        ) : msg.role === 'ai' && (
+                            <div className="msg-actions">
+                                <button 
+                                    className="action-btn" 
+                                    onClick={() => copyToClipboard(msg.content)}
+                                    title="Copy to clipboard"
+                                >
+                                    <i className="ph ph-copy"></i> Copy
+                                </button>
+                                {isSpeaking ? (
+                                    <button 
+                                        className="action-btn" 
+                                        onClick={stopSpeaking}
+                                        title="Stop speaking"
+                                    >
+                                        <i className="ph ph-stop"></i> Stop
+                                    </button>
+                                ) : (
+                                    <button 
+                                        className="action-btn" 
+                                        onClick={() => speak(msg.content)}
+                                        title="Read aloud"
+                                    >
+                                        <i className="ph ph-speaker-high"></i> Speak
+                                    </button>
+                                )}
+                                <button 
+                                    className="action-btn" 
+                                    onClick={handleRegenerate}
+                                    title="Regenerate response"
+                                >
+                                    <i className="ph ph-arrow-clockwise"></i> Regenerate
+                                </button>
+                            </div>
+                        )}
+                        
+                        {msg.role === 'user' && (
+                            <div className="msg-actions">
+                                <button 
+                                    className="action-btn" 
+                                    onClick={handleEdit}
+                                    title="Edit message"
+                                >
+                                    <i className="ph ph-pencil"></i> Edit
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 4. Main App Component ---
+        const App = () => {
+            const [input, setInput] = useState('');
+            const [history, setHistory] = useState([]);
+            const [currentChatId, setCurrentChatId] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768); // Open by default on desktop
+            const [isRecording, setIsRecording] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [settings, setSettings] = useState({
+                theme: 'dark',
+                fontSize: 16,
+                autoRead: false,
+                autoCopy: false,
+                responseSpeed: 'medium',
+                aiModel: 'gemini',
+                creativity: 0.7
+            });
+            const [showSettings, setShowSettings] = useState(false);
+            const [abortController, setAbortController] = useState(null);
+            const [isCollapsed, setIsCollapsed] = useState(false);
+
+            const chatContainerRef = useRef(null);
+            const inputRef = useRef(null);
+
+            // Logic for auto-expanding textarea as user types
+            useEffect(() => {
+                if (inputRef.current) {
+                    inputRef.current.style.height = '20px'; // Reset height
+                    inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+                }
+            }, [input]);
+
+
+            // Initialize chat on load (New Chat or first from history)
+            useEffect(() => {
+                const savedHistory = localStorage.getItem('chatHistory');
+                const savedSettings = localStorage.getItem('chatSettings');
+                
+                if (savedHistory) {
+                    try {
+                        const parsed = JSON.parse(savedHistory);
+                        setHistory(parsed);
+                        if (parsed.length > 0) {
+                            setCurrentChatId(parsed[0].id);
+                            setMessages(parsed[0].messages);
+                        } else {
+                             // If history is empty, start a new chat
+                            startNewChat(false);
+                        }
+                    } catch (err) {
+                        console.error('Failed to load history:', err);
+                        startNewChat(false); // Fallback to new chat on error
+                    }
+                } else {
+                    startNewChat(false);
+                }
+                
+                if (savedSettings) {
+                    try {
+                        setSettings(JSON.parse(savedSettings));
+                    } catch (err) {
+                        console.error('Failed to load settings:', err);
+                    }
+                }
+
+                 // Handle window resize for initial sidebar state on mobile
+                const handleResize = () => {
+                    if (window.innerWidth > 768) {
+                        setIsSidebarOpen(true);
+                    } else if (window.innerWidth <= 768) {
+                        // Only close on small screen if it's not already collapsed/open
+                        // setIsSidebarOpen(false);
+                    }
+                };
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+
+            }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+            // Save to localStorage
+            useEffect(() => {
+                localStorage.setItem('chatHistory', JSON.stringify(history));
+            }, [history]);
+
+            useEffect(() => {
+                localStorage.setItem('chatSettings', JSON.stringify(settings));
+            }, [settings]);
+
+            // Theme effect
+            useEffect(() => {
+                if (settings.theme === 'auto') {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    document.body.className = prefersDark ? '' : 'light-mode';
+                } else {
+                    document.body.className = settings.theme === 'light' ? 'light-mode' : '';
+                }
+            }, [settings.theme]);
+
+            // Auto-scroll
+            useEffect(() => {
+                if (chatContainerRef.current) {
+                    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                }
+            }, [messages]);
+            
+            // --- Chat Management Callbacks (FIX: Use useCallback for stability) ---
+
+            const toggleTheme = useCallback(() => {
+                setSettings(prev => ({
+                    ...prev,
+                    theme: prev.theme === 'dark' ? 'light' : 'dark'
+                }));
+            }, []);
+
+            const toggleSidebar = useCallback(() => {
+                 setIsSidebarOpen(prev => !prev);
+            }, []);
+
+            const startNewChat = useCallback((showToastMessage = true) => {
+                const newId = Date.now();
+                const newChat = { 
+                    id: newId, 
+                    title: 'New Chat', 
+                    messages: [],
+                    createdAt: new Date().toISOString()
+                };
+                setMessages([]);
+                setCurrentChatId(newId);
+                // Ensure the new chat is at the start of the history
+                setHistory(prev => [newChat, ...prev.filter(c => c.id !== newId)]);
+                if (inputRef.current) inputRef.current.focus();
+                if (showToastMessage) showToast('New chat started');
+            }, []);
+
+            const loadChat = useCallback((id) => {
+                const chat = history.find(c => c.id === id);
+                if (chat) {
+                    setCurrentChatId(id);
+                    setMessages(chat.messages);
+                    // Mobile fix is handled in Sidebar component now:
+                    // if (window.innerWidth < 768) { setIsSidebarOpen(false); }
+                }
+            }, [history]);
+
+            const deleteChat = useCallback((id) => {
+                setHistory(prev => {
+                    const filtered = prev.filter(chat => chat.id !== id);
+                    if (currentChatId === id) {
+                        if (filtered.length > 0) {
+                            // Find the next chat to load
+                            const nextChatId = filtered[0].id;
+                            loadChat(nextChatId);
+                        } else {
+                            // If no other chats, start a new one
+                            startNewChat();
+                        }
+                    }
+                    return filtered;
+                });
+                showToast('Chat deleted');
+            }, [currentChatId, loadChat, startNewChat]);
+
+            const clearAllChats = useCallback(() => {
+                setHistory([]);
+                startNewChat();
+                localStorage.removeItem('chatHistory');
+                showToast('All chats cleared');
+            }, [startNewChat]);
+
+            const renameChat = useCallback((id, newTitle) => {
+                setHistory(prev => 
+                    prev.map(chat => 
+                        chat.id === id ? { ...chat, title: newTitle } : chat
+                    )
+                );
+                showToast('Chat renamed');
+            }, []);
+
+            const saveCurrentChatToHistory = (msgs, firstUserMsg) => {
+                setHistory(prev => {
+                    const existing = prev.find(c => c.id === currentChatId);
+                    const newTitle = firstUserMsg.length > 30 
+                        ? firstUserMsg.substring(0, 30) + '...' 
+                        : firstUserMsg;
+
+                    if (existing) {
+                        // Update existing chat and move to top
+                        const updatedChat = { 
+                            ...existing, 
+                            messages: msgs,
+                            title: existing.title === 'New Chat' ? newTitle : existing.title,
+                            updatedAt: new Date().toISOString()
+                        };
+                        const filtered = prev.filter(c => c.id !== currentChatId);
+                        return [updatedChat, ...filtered];
+                    } else {
+                        // Create new chat and put at top
+                        return [{ 
+                            id: currentChatId, 
+                            title: newTitle, 
+                            messages: msgs,
+                            createdAt: new Date().toISOString()
+                        }, ...prev];
+                    }
+                });
+            };
+
+            const stopGeneration = useCallback(() => {
+                if (abortController) {
+                    abortController.abort();
+                    setIsLoading(false);
+                    // Remove the 'Thinking...' message
+                    setMessages(prev => prev.filter(msg => msg.content !== 'Thinking...'));
+                    
+                    // FIX: Ensure speech is also cancelled
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                    }
+                    
+                    showToast('Generation stopped');
+                }
+            }, [abortController]);
+
+            // --- THE FIXED BACKEND CONNECTION LOGIC ---
+            const handleSend = useCallback(async (userText = input) => {
+                if (!userText.trim()) return;
+                
+                if (isLoading && abortController) {
+                    stopGeneration();
+                }
+
+                const userMsg = { role: 'user', content: userText };
+                const updatedMessages = [...messages, userMsg];
+                
+                setMessages(updatedMessages);
+                setInput(''); // Clear input box
+                
+                // Clear the input box height after clearing input value
+                if (inputRef.current) {
+                    setTimeout(() => {
+                        inputRef.current.style.height = '20px';
+                    }, 0);
+                }
+
+                setIsLoading(true);
+                
+                // Determine the title to save (first user message in a new chat, otherwise keep existing title)
+                const currentChat = history.find(c => c.id === currentChatId);
+                const firstUserMsg = currentChat && currentChat.title !== 'New Chat' 
+                    ? currentChat.title 
+                    : userText;
+                
+                saveCurrentChatToHistory(updatedMessages, firstUserMsg);
+                setMessages(prev => [...prev.filter(msg => msg.content !== 'Thinking...'), { role: 'ai', content: 'Thinking...' }]);
+
+
+                try {
+                    const controller = new AbortController();
+                    setAbortController(controller);
+                    
+                    // The standard Node/Express endpoint for generating AI responses
+                    const response = await fetch("/generate", {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "X-AI-Model": settings.aiModel // Pass selected model setting to the backend
+                        },
+                        body: JSON.stringify({ 
+                            // The entire message history is sent for context (Standard chat model practice)
+                            prompt: userText,
+                            history: messages,
+                            // Pass other settings the backend might need
+                            temperature: settings.creativity,
+                            model: settings.aiModel
+                        }),
+                        signal: controller.signal
+                    });
+
+                    // Check if the response was successful
+                    if (!response.ok) {
+                        const bodyText = await response.text();
+                        // Throw an error to be caught below, indicating a *server* problem
+                        throw new Error(`Server responded with status ${response.status}: ${bodyText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // Backend is expected to return the response text in a field named 'response' or similar
+                    const aiText = data.response || data.response_text || data.answer || "No response received from server.";
+
+                    const aiMsg = { role: 'ai', content: aiText };
+                    const finalMessages = [...updatedMessages, aiMsg];
+                    
+                    // Update the state
+                    setMessages(prev => [...prev.filter(msg => msg.content !== 'Thinking...'), aiMsg]);
+                    saveCurrentChatToHistory(finalMessages, firstUserMsg);
+
+                } catch (err) {
+                    // Check if the error was due to cancellation
+                    if (err.name === 'AbortError') {
+                        // Generation was intentionally stopped. No toast needed.
+                        return;
+                    }
+                    
+                    // A failure to connect (network/CORS/backend down) or a server-side error
+                    console.error("Backend request failed:", err);
+                    
+                    // --- FALLBACK: Use Robust Simulation ---
+                    showToast('Backend connection failed - Using Simulator', true, 'warning');
+                    
+                    // Wait a bit to simulate thinking
+                    const speedFactor = settings.responseSpeed === 'fast' ? 500 : settings.responseSpeed === 'medium' ? 1200 : 2500;
+                    await new Promise(r => setTimeout(r, speedFactor));
+                    
+                    const aiText = getSimulatedResponse(userText, err.message);
+                    const aiMsg = { role: 'ai', content: aiText };
+                    const finalMessages = [...updatedMessages, aiMsg];
+
+                    // Remove 'Thinking...' message before adding final AI message
+                    setMessages(prev => [...prev.filter(msg => msg.content !== 'Thinking...'), aiMsg]);
+                    saveCurrentChatToHistory(finalMessages, firstUserMsg);
+                    
+                } finally {
+                    setIsLoading(false);
+                    setAbortController(null);
+                }
+            }, [input, isLoading, abortController, messages, history, currentChatId, settings.aiModel, settings.creativity, settings.responseSpeed, stopGeneration]); 
+
+            const handleMic = useCallback(() => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showToast("Speech API not supported", true, 'error');
+                    return;
+                }
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = () => setIsRecording(true);
+                recognition.onend = () => setIsRecording(false);
+                recognition.onerror = (event) => {
+                    setIsRecording(false);
+                    showToast("Speech recognition error: " + event.error, true, 'error');
+                };
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    setInput(prev => prev + (prev ? ' ' : '') + transcript);
+                    showToast("Voice input captured");
+                };
+                recognition.start();
+            }, []);
+
+            const handleRegenerate = useCallback(() => {
+                const lastUserIndex = messages.map((msg, idx) => msg.role === 'user' ? idx : -1)
+                    .filter(idx => idx !== -1)
+                    .pop();
+                
+                if (lastUserIndex !== undefined) {
+                    const lastUserMessage = messages[lastUserIndex].content;
+                    const messagesBefore = messages.slice(0, lastUserIndex); // Slice before the user message
+                    setMessages(messagesBefore);
+                    // Pass the last user message to handleSend
+                    handleSend(lastUserMessage);
+                }
+            }, [messages, handleSend]);
+
+            const handleEditMessage = useCallback((content) => {
+                setInput(content);
+                inputRef.current.focus();
+                // Find the index of the message to be edited
+                const messageIndex = messages.findIndex(msg => msg.content === content && msg.role === 'user');
+                if (messageIndex !== -1) {
+                    // Truncate messages to just before the message being edited
+                    setMessages(messages.slice(0, messageIndex));
+                }
+            }, [messages]);
+
+            // --- Import file and analyze (supports .txt, .md, .json, .pdf) ---
+            const importFileAndAnalyze = useCallback(() => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.txt,.md,.json,.pdf';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    showToast(`Importing: ${file.name}`);
+                    const ext = file.name.split('.').pop().toLowerCase();
+
+                    try {
+                        let text = '';
+
+                        if (ext === 'txt' || ext === 'md') {
+                            text = await file.text();
+                        } else if (ext === 'json') {
+                            const j = JSON.parse(await file.text());
+                            // If it's chat history use the messages, else stringify
+                            if (Array.isArray(j) && j.length > 0 && j[0].messages) {
+                                text = j.map(c => `${c.title || 'Chat'}:\n${(c.messages||[]).map(m => `${m.role}: ${m.content}`).join('\n')}`).join('\n\n');
+                            } else {
+                                text = JSON.stringify(j, null, 2);
+                            }
+                        } else if (ext === 'pdf') {
+                            // Use pdf.js to extract text
+                            const arrayBuffer = await file.arrayBuffer();
+                            // FIX: Ensure pdfjsLib is loaded correctly
+                            if (!window['pdfjsLib']) {
+                                showToast('PDF.js library not loaded', true, 'error');
+                                return;
+                            }
+                            const pdf = await window['pdfjsLib'].getDocument({ data: arrayBuffer }).promise;
+                            let fullText = '';
+                            for (let i=1; i<=pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const txtContent = await page.getTextContent();
+                                // Better text extraction: join with newline, filter out empty strings
+                                const pageText = txtContent.items.map(it => it.str).filter(s => s.trim().length > 0).join('\n');
+                                fullText += `\n\n--- Page ${i} ---\n\n` + pageText;
+                            }
+                            text = fullText.trim();
+                        } else {
+                            text = await file.text();
+                        }
+
+                        if (!text.trim()) {
+                            showToast('No text extracted from file', true, 'warning');
+                            return;
+                        }
+
+                        // Add user message with the file content summary indicator
+                        const prompt = `Analyze the following imported file and answer the user's likely question. Provide a short summary and bullet list of key points, then offer next steps.\n\n--- File Content Start ---\n${text.substring(0, 40000)}\n--- File Content End ---\n\nPlease summarize and answer.`;
+
+                        // Display a truncated version as user message
+                        const userDisplayContent = `Imported file: **${file.name}** (${(file.size / 1024).toFixed(2)} KB)\n\n--- Start of content excerpt ---\n${text.slice(0, 500)}...\n--- End of content excerpt ---`;
+                        const userMsg = { role: 'user', content: userDisplayContent };
+                        
+                        const updatedMessages = [...messages, userMsg];
+                        setMessages(updatedMessages);
+                        saveCurrentChatToHistory(updatedMessages, `Analyze ${file.name}`);
+                        
+                        // call handleSend but with the full prompt (not using input)
+                        handleSend(prompt);
+
+                    } catch (err) {
+                        console.error('Import error', err);
+                        showToast('Failed to import file', true, 'error');
+                    }
+                };
+                fileInput.click();
+            }, [messages, handleSend]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+            // --- Import chat JSON function (legacy) ---
+            const importChats = useCallback(() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const imported = JSON.parse(e.target.result);
+                            if (Array.isArray(imported)) {
+                                setHistory(imported);
+                                if (imported.length > 0) {
+                                    setCurrentChatId(imported[0].id);
+                                    setMessages(imported[0].messages);
+                                }
+                                showToast(`Imported ${imported.length} chats`);
+                            } else {
+                                throw new Error('Invalid format');
+                            }
+                        } catch (err) {
+                            showToast('Failed to import: Invalid file format', true, 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                };
+                input.click();
+            }, []);
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+                if (e.key === 'Escape' && isLoading) {
+                    stopGeneration();
+                }
+            };
+
+            // --- Share functionality (replaces export) ---
+            const buildChatTextForShare = () => {
+                if (!messages || messages.length === 0) return "Chat is empty.";
+                const parts = messages.map(m => {
+                    const who = m.role === 'user' ? 'You' : 'AI';
+                    // remove markdown for simpler share text
+                    const txt = (m.content || '').replace(/[#*_`]/g, '').trim();
+                    return `${who}: ${txt}`;
+                });
+                return parts.join('\n\n');
+            };
+
+            const shareCurrentChat = useCallback(async () => {
+                try {
+                    const chatText = buildChatTextForShare();
+                    const title = `AI Chat - ${new Date().toLocaleString()}`;
+
+                    // Use Web Share API if available (mobile/modern browsers)
+                    if (navigator.share) {
+                        await navigator.share({
+                            title,
+                            text: chatText
+                        });
+                        showToast('Shared via system share sheet');
+                        return;
+                    }
+
+                    // Fallbacks: Copy to clipboard and inform user
+                    await navigator.clipboard.writeText(chatText);
+                    showToast('Chat copied to clipboard. Share manually.');
+
+                } catch (err) {
+                    console.error('Share failed', err);
+                    showToast('Share failed: clipboard access denied.', true, 'error');
+                }
+            }, [messages]);
+
+            // --- Simple simulator response (fallback when backend not available) ---
+            const getSimulatedResponse = (userText, errorMessage = "") => {
+                if (errorMessage.includes('Server responded with status 400')) return "The backend server received your request but returned an error (Status 400). Please check the server logs for API key or formatting issues.";
+                if (/hello|hi/i.test(userText)) return "Hello! I am a simulated AI assistant. The backend server seems to be unreachable, so I am running in local mode. How can I help you today?";
+                if (/summary/i.test(userText)) return "As a simulator, I can't access live data, but here's a short simulated summary: ... Try running the full backend to get a real response.";
+                if (/error|bug|debug|code/i.test(userText)) return "```javascript\n// Simulated code fix\nfunction fixError(bug) {\n    if (bug.type === 'logic') {\n        return 'Verify assumptions and boundary conditions.';\n    }\n    return 'Try checking console logs and refreshing.';\n}\n```";
+                return "Sorry, I couldn't reach the backend server. This is a simulated reply to keep the app responsive. My current response is: *I don't know the answer to that.*";
+            };
+
+            return (
+                <>
+                    <SettingsModal 
+                        isOpen={showSettings}
+                        onClose={() => setShowSettings(false)}
+                        settings={settings}
+                        onSettingsChange={setSettings}
+                    />
+                    
+                    <Sidebar 
+                        history={history}
+                        activeChatId={currentChatId}
+                        onSelectChat={loadChat}
+                        onNewChat={startNewChat}
+                        onDeleteChat={deleteChat}
+                        onClearAllChats={clearAllChats}
+                        onRenameChat={renameChat}
+                        isOpen={isSidebarOpen}
+                        toggleSidebar={toggleSidebar}
+                        onShareChats={shareCurrentChat}
+                        onImportChats={() => {
+                            // User can choose between importing chat history (JSON) or a file for analysis (PDF/TXT/MD/JSON)
+                            const choice = confirm('OK = Import chat history (JSON file). Cancel = Import a document to analyze (PDF, TXT, MD, or JSON data file).');
+                            if (choice) importChats();
+                            else importFileAndAnalyze();
+                        }}
+                        isCollapsed={isCollapsed}
+                        setCollapsed={setIsCollapsed}
+                    />
+
+                    <div className="main-chat">
+                        <div className="header">
+                            <div className="header-left">
+                                <button className="mobile-menu-btn" onClick={toggleSidebar}>
+                                    <i className="ph ph-list"></i>
+                                </button>
+                                <h3 style={{fontWeight:600, display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                    <i className="ph ph-lightning"></i> AI Chatbot
+                                    {isLoading && (
+                                        <span style={{fontSize: '0.7em', opacity: 0.7, fontWeight: 'normal'}}>
+                                            (Thinking...)
+                                        </span>
+                                    )}
+                                </h3>
+                            </div>
+                            
+                            <div className="header-actions">
+                                {isLoading && (
+                                    <button className="icon-btn stop-btn" onClick={stopGeneration} title="Stop generation">
+                                        <i className="ph ph-stop-circle"></i>
+                                    </button>
+                                )}
+                                <button className="icon-btn" onClick={() => setShowSettings(true)} title="Settings">
+                                    <i className="ph ph-gear"></i>
+                                </button>
+                                <button className="icon-btn" onClick={toggleTheme} title="Toggle Theme">
+                                    {settings.theme === 'dark' || (settings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 
+                                        <i className="ph ph-sun" style={{fontSize:'20px'}}></i> : 
+                                        <i className="ph ph-moon" style={{fontSize:'20px'}}></i>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="chat-container" ref={chatContainerRef}>
+                            {messages.length === 0 ? (
+                                <div style={{textAlign:'center', marginTop:'15vh', opacity:0.6, padding:'20px'}}>
+                                    <i className="ph ph-robot" style={{fontSize:'50px', marginBottom:'20px'}}></i>
+                                    <h2>How can I help you today?</h2>
+                                    <p style={{marginTop: '10px', opacity: 0.7}}>
+                                        Start by typing a message or click a suggestion below
+                                    </p>
+                                    <div style={{marginTop: '30px', display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center'}}>
+                                        <div className="suggestion-chip" onClick={() => handleSend("Write a creative story")}>
+                                            <i className="ph ph-pen-nib"></i> Creative writing
+                                        </div>
+                                        <div className="suggestion-chip" onClick={() => handleSend("Help me solve a problem")}>
+                                            <i className="ph ph-math-operations"></i> Problem solving
+                                        </div>
+                                        <div className="suggestion-chip" onClick={() => handleSend("Explain a complex topic")}>
+                                            <i className="ph ph-book-open"></i> Learning assistant
+                                        </div>
+                                        <div className="suggestion-chip" onClick={() => handleSend("Summarize this text for me")}>
+                                            <i className="ph ph-magnifying-glass"></i> Research help
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                messages.map((m, i) => (
+                                    <ChatMessage 
+                                        key={i} 
+                                        msg={m} 
+                                        onRegenerate={handleRegenerate}
+                                        onEdit={handleEditMessage}
+                                        settings={settings}
+                                    />
+                                ))
+                            )}
+                        </div>
+
+                        <div className="input-area">
+                            <div className="input-wrapper">
+                                <textarea 
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Message AI Chatbot..."
+                                    rows="1"
+                                    disabled={isLoading}
+                                ></textarea>
+                                <div className="input-actions">
+                                    <button 
+                                        className={`icon-btn ${isRecording ? 'recording' : ''}`} 
+                                        onClick={handleMic} 
+                                        title="Voice Input"
+                                        disabled={isLoading}
+                                    >
+                                        <i className="ph ph-microphone" style={{fontSize:'20px'}}></i>
+                                    </button>
+                                    <button 
+                                        className="icon-btn send-btn" 
+                                        onClick={() => handleSend()} 
+                                        disabled={!input.trim() || isLoading}
+                                        title={isLoading ? "Generating..." : "Send Message"}
+                                    >
+                                        {isLoading ? 
+                                            <i className="ph ph-spinner ph-spin" style={{fontSize:'20px'}}></i> : 
+                                            <i className="ph ph-paper-plane-right" style={{fontSize:'20px'}}></i>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+        // Cleaned up showToast to be defined outside of App for global access
+
+    </script>
+
+    <script>
+        // Enhanced Three.js background with better bubbles (Unchanged as it was functional)
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true, 
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById("container").appendChild(renderer.domElement);
+        camera.position.z = 15;
+
+        // Create bubble particles
+        const bubbles = [];
+        const bubbleCount = 50;
+
+        // Different bubble sizes
+        const smallGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const mediumGeometry = new THREE.SphereGeometry(1, 32, 32);
+        const largeGeometry = new THREE.SphereGeometry(1.5, 32, 32);
+
+        for (let i = 0; i < bubbleCount; i++) {
+            let geometry;
+            if (i < bubbleCount * 0.6) {
+                geometry = smallGeometry; // 60% small
+            } else if (i < bubbleCount * 0.9) {
+                geometry = mediumGeometry; // 30% medium
+            } else {
+                geometry = largeGeometry; // 10% large
+            }
+
+            const hue = Math.random() * 0.3 + 0.5; // Blue-green hues
+            const material = new THREE.MeshPhongMaterial({
+                color: new THREE.Color().setHSL(hue, 0.7, 0.6),
+                transparent: true,
+                opacity: 0.15 + Math.random() * 0.1,
+                shininess: 100,
+                specular: new THREE.Color().setHSL(hue, 0.3, 0.9)
+            });
+
+            const bubble = new THREE.Mesh(geometry, material);
+            
+            // Random position
+            bubble.position.set(
+                Math.random() * 60 - 30,
+                Math.random() * 40 - 20,
+                Math.random() * 40 - 20
+            );
+            
+            // Random movement properties
+            bubble.userData = {
+                speedY: Math.random() * 0.02 + 0.005,
+                speedX: (Math.random() - 0.5) * 0.005,
+                rotationSpeed: (Math.random() - 0.5) * 0.01,
+                floatOffset: Math.random() * Math.PI * 2
+            };
+
+            scene.add(bubble);
+            bubbles.push(bubble);
+        }
+
+        // Enhanced lighting
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 15);
+        scene.add(directionalLight);
+
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x4a90e2, 0.3, 100);
+        pointLight.position.set(0, 0, 20);
+        scene.add(pointLight);
+
+        // Animation with floating effect
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            bubbles.forEach(bubble => {
+                // Vertical movement
+                bubble.position.y += bubble.userData.speedY;
+                
+                // Horizontal sway
+                bubble.position.x += Math.sin(time + bubble.userData.floatOffset) * bubble.userData.speedX;
+                
+                // Rotation
+                bubble.rotation.x += bubble.userData.rotationSpeed * 0.5;
+                bubble.rotation.y += bubble.userData.rotationSpeed;
+                
+                // Reset position if out of bounds
+                if (bubble.position.y > 25) {
+                    bubble.position.y = -25;
+                    bubble.position.x = Math.random() * 60 - 30;
+                }
+                
+                // Pulsing opacity
+                bubble.material.opacity = 0.15 + 0.1 * Math.sin(time + bubble.userData.floatOffset);
+            });
+
+            // Slowly rotate camera for dynamic view
+            camera.position.x = Math.sin(time * 0.05) * 2;
+            camera.position.y = Math.cos(time * 0.03) * 1;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Handle theme changes for bubble colors
+        const observer = new MutationObserver(() => {
+            const isLightMode = document.body.classList.contains('light-mode');
+            const baseHue = isLightMode ? 0.7 : 0.5; // Different hues for light/dark mode
+            
+            bubbles.forEach(bubble => {
+                const hue = baseHue + Math.random() * 0.2;
+                bubble.material.color.setHSL(hue, 0.7, isLightMode ? 0.7 : 0.6);
+            });
+        });
+
+        observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    </script>
+</body>
+</html>
